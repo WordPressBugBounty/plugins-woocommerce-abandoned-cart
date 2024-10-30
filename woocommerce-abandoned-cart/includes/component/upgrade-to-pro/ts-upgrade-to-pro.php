@@ -1,10 +1,10 @@
 <?php
 /**
- * Class Ts_Upgrade_To_Pro
+ * Class Ts_Upgrade_To_Pro_AC
  *
  * @since 1.0.0
  */
-class Ts_Upgrade_To_Pro {
+class Ts_Upgrade_To_Pro_AC {
 
 	/**
 	 * The capability users should have to view the page.
@@ -127,10 +127,36 @@ class Ts_Upgrade_To_Pro {
 		add_action( self::$plugin_prefix . '_add_tab_content', array( $this, 'ts_upgrade_to_pro_content' ) );
 		add_action( self::$plugin_prefix . '_after_settings_page_form', array( &$this, 'ts_add_upgrade_to_pro_modal' ) );
 		add_action( 'admin_enqueue_scripts', array( &$this, 'ts_custom_notice_style' ) );
+		add_action( 'wp_ajax_wcal_dismiss_upgrade_to_pro', array( &$this, 'dismiss_upgrade_to_pro_notice' ) );
 
 		self::$plugin_folder = $ts_plugin_folder_name;
 		self::$plugin_url    = $this->ts_get_plugin_url();
 		self::$template_base = $this->ts_get_template_path();
+	}
+
+	/**
+	 * Called when the dismiss icon is clicked on the notice.
+	 */
+	public function dismiss_upgrade_to_pro_notice() {
+		if ( current_user_can( 'manage_woocommerce' ) && isset( $_POST['security'] ) && ( isset( $_POST['security'] ) && wp_verify_nonce( sanitize_key( $_POST['security'] ), 'tracking_notice' ) ) ) {
+
+			if ( isset( $_POST['upgrade_to_pro_type'] ) ) {
+				$type = sanitize_text_field( wp_unslash( $_POST['upgrade_to_pro_type'] ) );
+				switch ( $type ) {
+					case 'purchase':
+						update_option( 'wcal_upgrade_to_pro_notice_dismissed', 'yes' );
+						break;
+					case 'expired':
+						update_option( 'wcal_upgrade_to_pro_notice_expired_dismissed', 'yes' );
+						break;
+					default:
+						break;
+				}
+			}
+			return 'success';
+		} else {
+			die( 'Security check failed' );
+		}
 	}
 
 	/**
@@ -242,9 +268,14 @@ class Ts_Upgrade_To_Pro {
 		$trial   = get_option( 'wcap_edd_license_download_type', '' ); // If trial license is used then we are storing it as trial as this option.
 
 		if ( 'trial' === $trial ) {
-			$trial_expired = get_option( 'wcap_deactivated_due_to_trial_expiry', '' );
-			$license_key   = trim( get_option( self::$ts_license_key_option_name, '' ) );
-			$renew_link    = add_query_arg(
+			if ( 'yes' === get_option( 'wcal_upgrade_to_pro_notice_expired_dismissed', '' ) ) {
+				return;
+			}
+
+			$notice_purchase_or_expired = 'wcal-pro-expired-notice';
+			$trial_expired              = get_option( 'wcap_deactivated_due_to_trial_expiry', '' );
+			$license_key                = trim( get_option( self::$ts_license_key_option_name, '' ) );
+			$renew_link                 = add_query_arg(
 				array(
 					'edd_license_key' => $license_key,
 					'download_id'     => self::$ts_item_id,
@@ -254,14 +285,18 @@ class Ts_Upgrade_To_Pro {
 			/* translators: %s: Renew Link */
 			$message = sprintf( __( 'Your Woo store is losing its WOW factor. Your Abandoned Cart Pro for WooCommerce license has expired. <a href="%s" target="_blank" class="button">Renew Now</a>', 'woocommerce-abandoned-cart' ), $renew_link );
 		} else {
+			if ( 'yes' === get_option( 'wcal_upgrade_to_pro_notice_dismissed', '' ) ) {
+				return;
+			}
+			$notice_purchase_or_expired = 'wcal-upgrade-to-pro-notice';
 			/* translators: %s: AC Trial Version Download page Link */
 			$message = sprintf( __( 'Upgrade to the PRO version of Abandoned Cart Pro for WooCommerce plugin for $1! Enjoy all Pro features for 30 days at this insane price. Limited time offer <a href="%s" class="button-primary button button-large" target="_blank"><b>Act now!</b></a>', 'woocommerce-abandoned-cart' ), WCAL_TRIAL_URL );
 		}
 
-		$show = ( isset( $_GET['action'] ) && 'upload-plugin' === $_GET['action'] ) ? false : true; // phpcs:ignore.
+		$show = isset( $_GET['page'] ) && 'woocommerce_ac_page' === $_GET['page'] ? true : false; // phpcs:ignore
 
 		if ( '' !== $message && $show ) { ?>
-			<div class="wcal-message notice">
+			<div class="<?php echo esc_html( $notice_purchase_or_expired ); ?> wcal-message notice is-dismissible">
 				<div class="wcal-content">
 					<img class="wcal-site-logo" src="<?php echo esc_url( plugins_url( '/assets/images/tyche-logo.png', __FILE__ ) ); ?> ">
 					<p><?php echo $message; //phpcs:ignore ?></p>
