@@ -2,15 +2,15 @@
 /**
  * Plugin Name: Abandoned Cart Lite for WooCommerce
  * Plugin URI: http://www.tychesoftwares.com/store/premium-plugins/woocommerce-abandoned-cart-pro
- * Description: This plugin captures abandoned carts by logged-in users & emails them about it. Enjoy all the premium features at no extra cost for 2 months. Click <strong><a href="https://www.tychesoftwares.com/products/woocommerce-abandoned-cart-pro-plugin-trial">here</a></strong> to Upgrade to PRO for FREE.
- * Version: 6.4.0
+ * Description: Track abandoned carts and send automated, customizable abandoned cart recovery emails. Reduce cart abandonment, recover lost revenue & increase sales.
+ * Version: 6.5.0
  * Author: Tyche Softwares
  * Author URI: http://www.tychesoftwares.com/
  * Text Domain: woocommerce-abandoned-cart
  * Domain Path: /i18n/languages/
  * Requires PHP: 7.4 or higher
  * WC requires at least: 4.0.0
- * WC tested up to: 9.7.1
+ * WC tested up to: 10.0.3
  * Requires Plugins: woocommerce
  *
  * @package Abandoned-Cart-Lite-for-WooCommerce
@@ -121,7 +121,7 @@ if ( ! class_exists( 'woocommerce_abandon_cart_lite' ) ) {
 			}
 
 			if ( ! defined( 'WCAL_PLUGIN_VERSION' ) ) {
-				define( 'WCAL_PLUGIN_VERSION', '6.4.0' );
+				define( 'WCAL_PLUGIN_VERSION', '6.5.0' );
 			}
 
 			if ( ! defined( 'WCAL_PLUGIN_PATH' ) ) {
@@ -1634,7 +1634,12 @@ if ( ! class_exists( 'woocommerce_abandon_cart_lite' ) ) {
 					$get_cookie = WC()->session->get_customer_id();
 
 					if ( function_exists( 'WC' ) ) {
-						$cart['cart'] = WC()->session->cart;
+						$wc_version = defined( 'WC_VERSION' ) ? WC_VERSION : null;
+						if ( $wc_version && version_compare( $wc_version, '10.0.0', '>=' ) ) {
+							$cart['cart'] = WC()->cart->get_cart();
+						} else {
+							$cart['cart'] = WC()->session->cart;
+						}
 					} else {
 						$cart['cart'] = $woocommerce->session->cart;
 					}
