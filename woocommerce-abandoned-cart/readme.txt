@@ -3,8 +3,8 @@ Contributors: ashokrane, pinal.shah, chetnapatel, tychesoftwares
 Tags: woocommerce cart abandonment, woocommerce cart abandonment recovery, Cart abandonment recovery, Cart abandonment rate, Cart abandonment solutions
 Author URI: https://www.tychesoftwares.com/
 Requires at least: 6.3 or higher
-Tested up to: 6.8.2
-Stable tag: 6.5.0
+Tested up to: 6.9
+Stable tag: 6.7.0
 Requires PHP: 7.3
 License: GPLv2 or late
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
@@ -24,11 +24,15 @@ According to experts, the average cart abandonment rate is around 70% to 75%. Th
 
 The FREE Abandoned Cart Lite for WooCommerce is bundled with all the essential features you need for abandoned cart recovery. 
 
+**What if you can get better features for less money? -[Try Abandoned Cart Pro for just $1](http://www.tychesoftwares.com/store/premium-plugins/woocommerce-abandoned-cart-pro/?utm_source=wprepo&utm_medium=link&utm_campaign=AbandonedCartLite)**
+
 ### Abandoned Cart Lite for WooCommerce Features 
 
 * Check if the cart is abandoned by the guest client or logged in user
 * Tracking percentage of recovery done
 * Send a reminder email within a few minutes after the cart gets abandoned
+* Send an email notification to the store admin when a cart is abandoned, so the admin is informed whenever cart abandonment happens
+* Exclude abandoned carts from being tracked based on IP address, email, domain, or country, allowing admins to control which carts are captured
 * Abandoned cart templates for quick setup
 * Copy HTML from anywhere & create templates using the powerful Rich Text Editor
 * A handy report showing the number of times a product was abandoned and recovered
@@ -163,6 +167,16 @@ The admin can use the merge code `{{cart.unsubscribe}}' in the email templates. 
 This plugin communicates with our tracking server to send usage data **only** if the user has explicitly opted in to usage tracking. For detailed information about what is tracked, please refer to our [usage tracking documentation](https://www.tychesoftwares.com/docs/woocommerce-abandoned-cart-lite/default-settings/#f-reset-usage-tracking).
 
 == Changelog ==
+
+= 6.7.0 (14.01.2026) =
+* Enhancement - Added the “Email admin on cart abandonment” option to notify the store administrator when a cart is abandoned.
+* Enhancement - Added exclusion rules to prevent capturing abandoned carts based on IP address, email, domain, or country.
+
+= 6.6.0 (02.12.2025) =
+* Fix – Abandoned cart reminder emails, including test emails, were not being sent when the email subject contained the '!' character.
+* Fix – Corrected CRLF line endings in plugin files.
+* Fix – Reminder email subject was displaying "A&amp;A" instead of "A&A".
+* Fix – Updated FAQs in the "FAQ & Support" tab.
 
 = 6.5.0 (23.07.2025) =
 * Fix - Reminder emails not being sent with WooCommerce version 10.0 and above.
