@@ -3,14 +3,14 @@
  * Plugin Name: Abandoned Cart Lite for WooCommerce
  * Plugin URI: http://www.tychesoftwares.com/store/premium-plugins/woocommerce-abandoned-cart-pro
  * Description: Track abandoned carts and send automated, customizable abandoned cart recovery emails. Reduce cart abandonment, recover lost revenue & increase sales.
- * Version: 6.7.0
+ * Version: 6.8.0
  * Author: Tyche Softwares
  * Author URI: http://www.tychesoftwares.com/
  * Text Domain: woocommerce-abandoned-cart
  * Domain Path: /i18n/languages/
  * Requires PHP: 7.4 or higher
  * WC requires at least: 4.0.0
- * WC tested up to: 10.3.5
+ * WC tested up to: 10.7.0
  * Requires Plugins: woocommerce
  *
  * @package Abandoned-Cart-Lite-for-WooCommerce
@@ -121,7 +121,7 @@ if ( ! class_exists( 'woocommerce_abandon_cart_lite' ) ) {
 			}
 
 			if ( ! defined( 'WCAL_PLUGIN_VERSION' ) ) {
-				define( 'WCAL_PLUGIN_VERSION', '6.7.0' );
+				define( 'WCAL_PLUGIN_VERSION', '6.8.0' );
 			}
 
 			if ( ! defined( 'WCAL_PLUGIN_PATH' ) ) {
@@ -4123,7 +4123,8 @@ if ( ! class_exists( 'woocommerce_abandon_cart_lite' ) ) {
 
 			if ( isset( $_GET['page'] ) && 'woocommerce_ac_page' === $_GET['page'] ) { // phpcs:ignore WordPress.Security.NonceVerification
 				$footer_text = __( 'If you love <strong>Abandoned Cart Lite for WooCommerce</strong>, then please leave us a <a href="https://wordpress.org/support/plugin/woocommerce-abandoned-cart/reviews/?rate=5#new-post" target="_blank" class="ac-rating-link" data-rated="Thanks :)">★★★★★</a> rating. Thank you in advance. :)', 'woocommerce-abandoned-cart' );
-				wc_enqueue_js(
+				wp_add_inline_script(
+					'jquery',
 					"
 						jQuery( 'a.ac-rating-link' ).click( function() {
 							jQuery( this ).parent().text( jQuery( this ).data( 'rated' ) );
