@@ -3,14 +3,14 @@
  * Plugin Name: Abandoned Cart Lite for WooCommerce
  * Plugin URI: http://www.tychesoftwares.com/store/premium-plugins/woocommerce-abandoned-cart-pro
  * Description: Track abandoned carts and send automated, customizable abandoned cart recovery emails. Reduce cart abandonment, recover lost revenue & increase sales.
- * Version: 6.8.0
+ * Version: 6.8.1
  * Author: Tyche Softwares
  * Author URI: http://www.tychesoftwares.com/
  * Text Domain: woocommerce-abandoned-cart
  * Domain Path: /i18n/languages/
  * Requires PHP: 7.4 or higher
  * WC requires at least: 4.0.0
- * WC tested up to: 10.7.0
+ * WC tested up to: 10.8.1
  * Requires Plugins: woocommerce
  *
  * @package Abandoned-Cart-Lite-for-WooCommerce
@@ -121,7 +121,7 @@ if ( ! class_exists( 'woocommerce_abandon_cart_lite' ) ) {
 			}
 
 			if ( ! defined( 'WCAL_PLUGIN_VERSION' ) ) {
-				define( 'WCAL_PLUGIN_VERSION', '6.8.0' );
+				define( 'WCAL_PLUGIN_VERSION', '6.8.1' );
 			}
 
 			if ( ! defined( 'WCAL_PLUGIN_PATH' ) ) {
@@ -511,7 +511,8 @@ if ( ! class_exists( 'woocommerce_abandon_cart_lite' ) ) {
 					}
 					$message = $email_body_template_header . $message . $email_body_template_footer;
 				}
-				echo $message; // phpcs:ignore
+				header( 'Content-Security-Policy: sandbox' );
+				echo wp_unslash( $message ); // phpcs:ignore
 				exit;
 			}
 
@@ -539,7 +540,8 @@ if ( ! class_exists( 'woocommerce_abandon_cart_lite' ) ) {
 					$message = ob_get_clean();
 				}
 				// print the preview email.
-				echo $message; // phpcs:ignore
+				header( 'Content-Security-Policy: sandbox' );
+				echo wp_unslash( $message ); // phpcs:ignore
 				exit;
 			}
 		}
@@ -2877,6 +2879,53 @@ if ( ! class_exists( 'woocommerce_abandon_cart_lite' ) ) {
 		}
 
 		/**
+		 * Verify a nonce for the current admin-side state-changing request.
+		 *
+		 * CSRF hardening: any branch of wcal_menu_page() that writes to the DB
+		 * (delete carts, delete / create / update / activate templates, run the
+		 * email_templates DB upgrade) must call this first. The plugin's own UI
+		 * already attaches one of the nonces listed below — see
+		 * class-wcal-abandoned-orders-table.php (row links) and WP_List_Table's
+		 * display_tablenav() (bulk dropdown) and the email-template form
+		 * (wp_nonce_field() added below). Accepting any of them lets us patch
+		 * the handler without changing every URL generator and keeps existing
+		 * UI flows working.
+		 *
+		 * On failure we wp_die() with the standard "link expired" message so
+		 * forged GET/POST requests from another origin are rejected before any
+		 * DB write happens.
+		 *
+		 * @since 6.8.1
+		 * @return void
+		 */
+		private function wcal_verify_admin_action_nonce() {
+			$nonce = isset( $_REQUEST['_wpnonce'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['_wpnonce'] ) ) : '';
+
+			// Each entry is a nonce action string that the plugin's own UI generates.
+			$valid_actions = array(
+				'abandoned_order_nonce',     // Single-row delete / edit links.
+				'bulk-abandoned_order_ids',  // Bulk dropdown on abandoned orders list (auto by WP_List_Table).
+				'bulk-template_ids',         // Bulk dropdown on email templates list (auto by WP_List_Table).
+				'wcal_email_template_form',  // Create / update email template form.
+				'wcal_update_email_templates',
+			);
+
+			if ( '' !== $nonce ) {
+				foreach ( $valid_actions as $valid_action ) {
+					if ( wp_verify_nonce( $nonce, $valid_action ) ) {
+						return;
+					}
+				}
+			}
+
+			wp_die(
+				esc_html__( 'The link you followed has expired. Please refresh the page and try again.', 'woocommerce-abandoned-cart' ),
+				esc_html__( 'Security check failed', 'woocommerce-abandoned-cart' ),
+				array( 'response' => 403 )
+			);
+		}
+
+		/**
 		 * Abandon Cart Settings Page. It will show the tabs, notices for the plugin.
 		 * It will also update the template records and display the template fields.
 		 * It will also show the abandoned cart details page.
@@ -2898,7 +2947,9 @@ if ( ! class_exists( 'woocommerce_abandon_cart_lite' ) ) {
 				<h2><?php esc_html_e( 'WooCommerce - Abandon Cart Lite', 'woocommerce-abandoned-cart' ); ?></h2>
 				<?php
 
-				if ( isset( $_GET['ac_update'] ) && 'email_templates' === sanitize_text_field( wp_unslash( $_GET['ac_update'] ) ) ) { // phpcs:ignore WordPress.Security.NonceVerification
+				if ( isset( $_GET['ac_update'] ) && 'email_templates' === sanitize_text_field( wp_unslash( $_GET['ac_update'] ) ) ) {
+					// CSRF: ac_update triggers an ALTER TABLE — require a valid nonce.
+					$this->wcal_verify_admin_action_nonce();
 					$status = wcal_common::update_templates_table();
 
 					if ( false !== $status ) {
@@ -2924,7 +2975,10 @@ if ( ! class_exists( 'woocommerce_abandon_cart_lite' ) ) {
 
 				// Detect when a bulk action is being triggered on abandoned orders page.
 				if ( 'wcal_delete' === $action || 'wcal_delete' === $action_two ) {
-					$ids = isset( $_GET['abandoned_order_id'] ) && is_array( $_GET['abandoned_order_id'] ) ? array_map( 'intval', wp_unslash( $_GET['abandoned_order_id'] ) ) : sanitize_text_field( wp_unslash( $_GET['abandoned_order_id'] ) ); // phpcs:ignore WordPress.Security.NonceVerification
+					// CSRF: triggered by row-action link (nonce 'abandoned_order_nonce')
+					// or bulk dropdown (nonce 'bulk-abandoned_order_ids'). Reject anything else.
+					$this->wcal_verify_admin_action_nonce();
+					$ids = isset( $_GET['abandoned_order_id'] ) && is_array( $_GET['abandoned_order_id'] ) ? array_map( 'intval', wp_unslash( $_GET['abandoned_order_id'] ) ) : sanitize_text_field( wp_unslash( $_GET['abandoned_order_id'] ) );
 					if ( ! is_array( $ids ) ) {
 						$ids = array( $ids );
 					}
@@ -2935,28 +2989,39 @@ if ( ! class_exists( 'woocommerce_abandon_cart_lite' ) ) {
 				}
 				// Abandoned Orders page - Bulk Action - Delete all registered user carts.
 				if ( 'wcal_delete_all_registered' === $action || 'wcal_delete_all_registered' === $action_two ) {
+					// CSRF: bulk-only action — require valid nonce.
+					$this->wcal_verify_admin_action_nonce();
 					$class = new Wcal_Delete_Handler();
 					$class->wcal_bulk_action_delete_registered_carts_handler();
 				}
 				// Abandoned Orders page - Bulk Action - Delete all guest carts.
 				if ( 'wcal_delete_all_guest' === $action || 'wcal_delete_all_guest' === $action_two ) {
+					// CSRF: bulk-only action — require valid nonce.
+					$this->wcal_verify_admin_action_nonce();
 					$class = new Wcal_Delete_Handler();
 					$class->wcal_bulk_action_delete_guest_carts_handler();
 				}
 				// Abandoned Orders page - Bulk Action - Delete all visitor carts.
 				if ( 'wcal_delete_all_visitor' === $action || 'wcal_delete_all_visitor' === $action_two ) {
+					// CSRF: bulk-only action — require valid nonce.
+					$this->wcal_verify_admin_action_nonce();
 					$class = new Wcal_Delete_Handler();
 					$class->wcal_bulk_action_delete_visitor_carts_handler();
 				}
 				// Abandoned Orders page - Bulk Action - Delete all carts.
 				if ( 'wcal_delete_all' === $action || 'wcal_delete_all' === $action_two ) {
+					// CSRF: bulk-only action — require valid nonce.
+					$this->wcal_verify_admin_action_nonce();
 					$class = new Wcal_Delete_Handler();
 					$class->wcal_bulk_action_delete_all_carts_handler();
 				}
 
 				// Detect when a bulk action is being triggered on templates page.
 				if ( 'wcal_delete_template' === $action || 'wcal_delete_template' === $action_two ) {
-					$ids = isset( $_GET['template_id'] ) && is_array( $_GET['template_id'] ) ? array_map( 'intval', wp_unslash( $_GET['template_id'] ) ) : sanitize_text_field( wp_unslash( $_GET['template_id'] ) ); // phpcs:ignore WordPress.Security.NonceVerification
+					// CSRF: triggered by row-action link (nonce 'abandoned_order_nonce')
+					// or bulk dropdown (nonce 'bulk-template_ids').
+					$this->wcal_verify_admin_action_nonce();
+					$ids = isset( $_GET['template_id'] ) && is_array( $_GET['template_id'] ) ? array_map( 'intval', wp_unslash( $_GET['template_id'] ) ) : sanitize_text_field( wp_unslash( $_GET['template_id'] ) );
 					if ( ! is_array( $ids ) ) {
 						$ids = array( $ids );
 					}
@@ -3198,7 +3263,9 @@ if ( ! class_exists( 'woocommerce_abandon_cart_lite' ) ) {
 						$new_tag                   = substr( $merge_tag, $start_tag );
 						$woocommerce_ac_email_body = str_ireplace( $merge_tag, $new_tag, $woocommerce_ac_email_body );
 					}
-					if ( isset( $_POST['ac_settings_frm'] ) && 'save' === sanitize_text_field( wp_unslash( $_POST['ac_settings_frm'] ) ) ) { // phpcs:ignore 
+					if ( isset( $_POST['ac_settings_frm'] ) && 'save' === sanitize_text_field( wp_unslash( $_POST['ac_settings_frm'] ) ) ) {
+						// CSRF: require the form-submission nonce printed by wp_nonce_field( 'wcal_email_template_form' ) below.
+						$this->wcal_verify_admin_action_nonce();
 						$default_value       = 0;
 						$coupon_code_id      = isset( $_POST['coupon_ids'][0] ) ? sanitize_text_field( wp_unslash( implode( ',', $_POST['coupon_ids'] ) ) ) : ''; // phpcs:ignore 
 						$unique_coupon       = ( empty( $_POST['unique_coupon'] ) ) ? '0' : '1'; // phpcs:ignore WordPress.Security.NonceVerification
@@ -3228,7 +3295,9 @@ if ( ! class_exists( 'woocommerce_abandon_cart_lite' ) ) {
 						);
 					}
 
-					if ( isset( $_POST['ac_settings_frm'] ) && 'update' === sanitize_text_field( wp_unslash( $_POST['ac_settings_frm'] ) ) ) { // phpcs:ignore WordPress.Security.NonceVerification
+					if ( isset( $_POST['ac_settings_frm'] ) && 'update' === sanitize_text_field( wp_unslash( $_POST['ac_settings_frm'] ) ) ) {
+						// CSRF: require the form-submission nonce printed by wp_nonce_field( 'wcal_email_template_form' ) below.
+						$this->wcal_verify_admin_action_nonce();
 
 						$updated_is_active = '0';
 						$id                = isset( $_POST['id'] ) ? trim( sanitize_text_field( wp_unslash( $_POST['id'] ) ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
@@ -3274,7 +3343,9 @@ if ( ! class_exists( 'woocommerce_abandon_cart_lite' ) ) {
 					}
 
 					if ( 'emailtemplates' === $action && 'removetemplate' === $mode ) {
-						$id_remove = isset( $_GET['id'] ) ? sanitize_text_field( wp_unslash( $_GET['id'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
+						// CSRF: this branch DELETEs a row by id from a GET param — must be nonce-protected.
+						$this->wcal_verify_admin_action_nonce();
+						$id_remove = isset( $_GET['id'] ) ? sanitize_text_field( wp_unslash( $_GET['id'] ) ) : '';
 						$wpdb->query( //phpcs:ignore
 							$wpdb->prepare(
 								'DELETE FROM `' . $wpdb->prefix . 'ac_email_templates_lite` WHERE id= %d ',
@@ -3284,8 +3355,10 @@ if ( ! class_exists( 'woocommerce_abandon_cart_lite' ) ) {
 					}
 
 					if ( 'emailtemplates' === $action && 'activate_template' === $mode ) {
-						$template_id             = isset( $_GET['id'] ) ? sanitize_text_field( wp_unslash( $_GET['id'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
-						$current_template_status = isset( $_GET['active_state'] ) ? sanitize_text_field( wp_unslash( $_GET['active_state'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
+						// CSRF: this branch toggles is_active state — must be nonce-protected.
+						$this->wcal_verify_admin_action_nonce();
+						$template_id             = isset( $_GET['id'] ) ? sanitize_text_field( wp_unslash( $_GET['id'] ) ) : '';
+						$current_template_status = isset( $_GET['active_state'] ) ? sanitize_text_field( wp_unslash( $_GET['active_state'] ) ) : '';
 
 						if ( '1' === $current_template_status ) {
 							$active = '0';
@@ -3873,6 +3946,7 @@ if ( ! class_exists( 'woocommerce_abandon_cart_lite' ) ) {
 				?>
 				<div id="content">
 					<form method="post" action="admin.php?page=woocommerce_ac_page&action=emailtemplates" id="ac_settings">
+					<?php wp_nonce_field( 'wcal_email_template_form' ); // CSRF: verified by wcal_verify_admin_action_nonce() on save/update. ?>
 					<input type="hidden" name="mode" value="<?php echo esc_html( $mode ); ?>" />
 						<?php
 						$id_by = isset( $_GET['id'] ) ? sanitize_text_field( wp_unslash( $_GET['id'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
