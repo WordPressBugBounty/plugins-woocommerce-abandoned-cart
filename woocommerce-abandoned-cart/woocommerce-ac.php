@@ -3,14 +3,14 @@
  * Plugin Name: Abandoned Cart Lite for WooCommerce
  * Plugin URI: http://www.tychesoftwares.com/store/premium-plugins/woocommerce-abandoned-cart-pro
  * Description: Track abandoned carts and send automated, customizable abandoned cart recovery emails. Reduce cart abandonment, recover lost revenue & increase sales.
- * Version: 6.8.2
+ * Version: 6.8.3
  * Author: Tyche Softwares
  * Author URI: http://www.tychesoftwares.com/
  * Text Domain: woocommerce-abandoned-cart
  * Domain Path: /i18n/languages/
  * Requires PHP: 7.4 or higher
  * WC requires at least: 4.0.0
- * WC tested up to: 10.8.1
+ * WC tested up to: 10.9.4
  * Requires Plugins: woocommerce
  *
  * @package Abandoned-Cart-Lite-for-WooCommerce
@@ -121,7 +121,7 @@ if ( ! class_exists( 'woocommerce_abandon_cart_lite' ) ) {
 			}
 
 			if ( ! defined( 'WCAL_PLUGIN_VERSION' ) ) {
-				define( 'WCAL_PLUGIN_VERSION', '6.8.2' );
+				define( 'WCAL_PLUGIN_VERSION', '6.8.3' );
 			}
 
 			if ( ! defined( 'WCAL_PLUGIN_PATH' ) ) {
@@ -511,7 +511,13 @@ if ( ! class_exists( 'woocommerce_abandon_cart_lite' ) ) {
 					}
 					$message = $email_body_template_header . $message . $email_body_template_footer;
 				}
-				header( 'Content-Security-Policy: sandbox' );
+				header(
+					"Content-Security-Policy: sandbox; " .
+					"default-src 'self'; " .
+					"style-src 'self' 'unsafe-inline' https:; " .
+					"font-src 'self' https:; " .
+					"img-src 'self' data: https:;"
+				);
 				echo wp_unslash( $message ); // phpcs:ignore
 				exit;
 			}
@@ -540,7 +546,13 @@ if ( ! class_exists( 'woocommerce_abandon_cart_lite' ) ) {
 					$message = ob_get_clean();
 				}
 				// print the preview email.
-				header( 'Content-Security-Policy: sandbox' );
+				header(
+					"Content-Security-Policy: sandbox; " .
+					"default-src 'self'; " .
+					"style-src 'self' 'unsafe-inline' https:; " .
+					"font-src 'self' https:; " .
+					"img-src 'self' data: https:;"
+				);
 				echo wp_unslash( $message ); // phpcs:ignore
 				exit;
 			}
